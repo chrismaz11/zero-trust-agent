@@ -1,0 +1,194 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Agent Audit Log Entry",
+  "description": "Structured log entry for every agent action. Each action — read, draft, send, error — generates one entry. Logs are append-only and immutable.",
+  "type": "object",
+  "required": [
+    "timestamp",
+    "agent",
+    "action",
+    "tier",
+    "integration",
+    "input_summary",
+    "output_summary",
+    "approval"
+  ],
+  "properties": {
+    "timestamp": {
+      "type": "string",
+      "format": "date-time",
+      "description": "ISO 8601 UTC timestamp of the action",
+      "examples": ["2026-06-06T19:30:00Z"]
+    },
+    "agent": {
+      "type": "string",
+      "description": "Agent identifier matching the scope document agent_name",
+      "examples": ["viktor", "content-bot", "code-reviewer"]
+    },
+    "action": {
+      "type": "string",
+      "enum": [
+        "read",
+        "draft",
+        "send",
+        "execute",
+        "approve",
+        "reject",
+        "edit",
+        "error",
+        "escalate",
+        "heartbeat",
+        "pause",
+        "resume",
+        "kill"
+      ],
+      "description": "The type of action performed"
+    },
+    "tier": {
+      "type": "string",
+      "enum": ["T0", "T1", "T2", "T3"],
+      "description": "The agent's permission tier at the time of action"
+    },
+    "integration": {
+      "type": "string",
+      "description": "The integration involved in this action",
+      "examples": ["slack", "github", "gmail", "database", "internal"]
+    },
+    "input_summary": {
+      "type": "string",
+      "description": "Brief description of what triggered the action",
+      "examples": [
+        "User requested daily brief",
+        "Scheduled cron: morning-digest",
+        "Incoming Slack message in #engineering"
+      ]
+    },
+    "output_summary": {
+      "type": "string",
+      "description": "Brief description of what the agent produced",
+      "examples": [
+        "Drafted 3-paragraph daily brief covering 12 channel updates",
+        "Generated PR review comment for feat/auth-flow",
+        "Error: GitHub API returned 403"
+      ]
+    },
+    "approval": {
+      "type": "object",
+      "required": ["status"],
+      "properties": {
+        "status": {
+          "type": "string",
+          "enum": ["pending", "approved", "rejected", "auto", "not_required"],
+          "description": "Current approval status"
+        },
+        "approver": {
+          "type": "string",
+          "description": "Identity of the human who approved/rejected",
+          "examples": ["christopher@trustsignal.dev"]
+        },
+        "approved_at": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Timestamp of approval/rejection"
+        },
+        "edit_summary": {
+          "type": "string",
+          "description": "What the approver changed before approving (if anything)"
+        }
+      }
+    },
+    "metadata": {
+      "type": "object",
+      "description": "Additional context specific to the action type",
+      "properties": {
+        "error_code": {
+          "type": "string",
+          "description": "Error code if action type is 'error'"
+        },
+        "error_message": {
+          "type": "string",
+          "description": "Human-readable error description"
+        },
+        "recipients": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Recipients for send actions (redacted if PII)"
+        },
+        "channel": {
+          "type": "string",
+          "description": "Slack channel or communication channel involved"
+        },
+        "file_paths": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Files read or generated"
+        },
+        "duration_ms": {
+          "type": "integer",
+          "description": "Duration of the action in milliseconds"
+        },
+        "confidence": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "description": "Agent's self-reported confidence in the output"
+        },
+        "incident_severity": {
+          "type": "string",
+          "enum": ["P0", "P1", "P2", "P3"],
+          "description": "Incident severity if this is an escalation"
+        }
+      }
+    },
+    "session_id": {
+      "type": "string",
+      "description": "Groups related actions into a single session/conversation",
+      "examples": ["sess_2026-06-06_morning-brief"]
+    },
+    "parent_action_id": {
+      "type": "string",
+      "description": "References the action that triggered this one (for chains)",
+      "examples": ["act_2026-06-06T19:28:00Z_read"]
+    }
+  },
+  "examples": [
+    {
+      "timestamp": "2026-06-06T19:30:00Z",
+      "agent": "viktor",
+      "action": "draft",
+      "tier": "T1",
+      "integration": "slack",
+      "input_summary": "Scheduled cron: daily morning brief",
+      "output_summary": "Drafted daily brief covering 3 channels, 8 threads, 2 action items",
+      "approval": {
+        "status": "approved",
+        "approver": "christopher@trustsignal.dev",
+        "approved_at": "2026-06-06T19:35:00Z"
+      },
+      "metadata": {
+        "channel": "#dm-christopher",
+        "duration_ms": 12400,
+        "confidence": 0.92
+      },
+      "session_id": "sess_2026-06-06_morning-brief"
+    },
+    {
+      "timestamp": "2026-06-06T20:15:00Z",
+      "agent": "viktor",
+      "action": "error",
+      "tier": "T1",
+      "integration": "github",
+      "input_summary": "Attempted to read PR #142 for code review",
+      "output_summary": "Error: GitHub API returned 403 Forbidden",
+      "approval": {
+        "status": "not_required"
+      },
+      "metadata": {
+        "error_code": "GITHUB_403",
+        "error_message": "Resource not accessible by integration",
+        "duration_ms": 340
+      },
+      "session_id": "sess_2026-06-06_code-review"
+    }
+  ]
+}

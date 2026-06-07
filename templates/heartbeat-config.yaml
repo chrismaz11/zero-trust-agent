@@ -1,0 +1,102 @@
+# Heartbeat Configuration Template
+#
+# Copy and customize for each agent deployment.
+# This file defines what the heartbeat monitors, how often, and where alerts go.
+
+agent: "[AGENT_NAME]"
+tier: "T1"  # T0 | T1 | T2 | T3
+
+# --- Schedule ---
+schedule:
+  # Cron expression for heartbeat frequency
+  # T0/T1: daily, T2: twice daily, T3: every 5 minutes
+  cron: "0 9 * * *"  # Daily at 9 AM
+  timezone: "America/Chicago"
+
+# --- Alert Channels ---
+alerts:
+  primary:
+    type: slack_dm  # slack_dm | slack_channel | email | webhook
+    target: "[OWNER_SLACK_ID or #CHANNEL]"
+  escalation:
+    type: slack_channel
+    target: "#[TEAM_CHANNEL]"
+    # Only used when primary alert is unacknowledged
+    delay_minutes: 60
+
+# --- Health Checks ---
+checks:
+
+  integration_connectivity:
+    enabled: true
+    timeout_seconds: 10
+    integrations:
+      - name: slack
+        test: "list_channels"  # API call to verify connectivity
+        required: true          # Failure = critical
+      - name: github
+        test: "list_repos"
+        required: true
+      # Add more integrations as needed
+      # - name: gmail
+      #   test: "list_labels"
+      #   required: false       # Failure = warning, not critical
+
+  knowledge_freshness:
+    enabled: true
+    staleness_threshold_days: 30
+    paths:
+      - path: "[/path/to/company-context.md]"
+        description: "Company context"
+      - path: "[/path/to/brand-rules.md]"
+        description: "Brand rules"
+      # Add more context files
+    severity_on_stale: "warn"  # warn | fail
+
+  approval_queue:
+    enabled: true
+    max_pending_hours: 48
+    escalation_hours: 72    # Escalate to backup after this
+    backup_approver: "[BACKUP_OWNER_SLACK_ID]"
+    # Never auto-approve, even after timeout
+    auto_approve: false
+
+  error_rate:
+    enabled: true
+    window_hours: 24
+    thresholds:
+      warn: 3     # Percentage — triggers warning
+      fail: 5     # Percentage — triggers auto-pause
+      critical: 15  # Percentage — triggers kill switch
+    auto_pause_on_fail: true
+
+  output_quality:
+    enabled: true
+    sample_size: 5       # Number of recent outputs to spot-check
+    sample_method: random  # random | latest | oldest
+    # Quality checks are surfaced for manual review, not auto-scored
+    severity_on_flag: "warn"
+
+# --- Auto-Actions ---
+auto_actions:
+  # What happens automatically when checks fail
+  on_integration_down:
+    action: pause_affected_workflows
+    retry_after_minutes: 5
+    max_retries: 1
+
+  on_error_rate_exceeded:
+    action: pause_agent
+    notify: [primary, escalation]
+
+  on_critical_error_rate:
+    action: kill_switch
+    notify: [primary, escalation]
+
+# --- Reporting ---
+reporting:
+  # Where to post the heartbeat summary
+  channel: "[OWNER_SLACK_DM or #CHANNEL]"
+  # Only post when there's something to report, or always?
+  post_when: "always"  # always | on_issue | on_failure
+  format: "summary"     # summary | detailed
