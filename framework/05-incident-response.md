@@ -1,134 +1,191 @@
 # Incident Response
 
-When an agent produces harmful, inaccurate, or off-scope output, follow this protocol. Speed matters — especially at P0 and P1.
+> When an agent breaks, every minute of confusion costs trust. This is the playbook for handling incidents — from detection to resolution to post-mortem.
+
+---
 
 ## Severity Matrix
 
-### P0 — Critical
-
-**Definition:** Agent sent unauthorized external communication, exposed PII, leaked credentials, or made false public claims.
-
-**Examples:**
-- Agent emailed a client without approval
-- Agent committed code containing API keys to a public repo
-- Agent posted false revenue numbers in a public channel
-- Agent contacted a blocklisted entity
-
-**Response:**
-1. **Immediately** trigger the kill switch (< 5 minutes)
-2. Assess blast radius — what was sent, to whom, what data was exposed
-3. Notify affected parties within 1 hour
-4. Preserve all logs (do not modify or delete anything)
-5. Begin post-mortem within 4 hours
-
-**Timeline:** 0–1 hour for containment. 4 hours for post-mortem start. 24 hours for full report.
+| Level | Name | Description | Response Time | Examples |
+|-------|------|-------------|---------------|----------|
+| **P0** | Critical | Agent causing active harm, data breach, or uncontrolled execution | Immediate | Sending unauthorized messages, accessing wrong tenant's data, financial actions without approval, kill switch failure |
+| **P1** | High | Agent malfunctioning but impact is contained | 15 minutes | Elevated error rate, repeated incorrect outputs, approval pipeline bypass, anomaly detection triggered |
+| **P2** | Medium | Degraded performance, no active harm | 1 hour | Slow response times, intermittent errors, rising rejection rate, stale knowledge base |
+| **P3** | Low | Minor issue, no user impact | Next business day | Cosmetic output issues, non-critical log gaps, documentation out of date |
 
 ---
+
+## Response Procedures
+
+### P0 — Critical
+
+```
+MINUTE 0: DETECT
+  → Kill switch triggered (automatic or manual)
+  → Agent suspended at T0 (read-only)
+  → All pending actions cancelled
+
+MINUTE 0-5: CONTAIN
+  → Verify kill switch took effect
+  → Check: are unauthorized actions still executing?
+  → If yes: escalate to infrastructure (kill the process/container)
+  → Notify: agent owner + engineering lead + affected stakeholders
+
+MINUTE 5-30: ASSESS
+  → Pull audit logs for the incident window
+  → Identify: what actions were taken, what data was accessed
+  → Identify: root cause (prompt issue? permission config? integration failure?)
+  → Determine: is there customer/user impact requiring notification?
+
+MINUTE 30-120: REMEDIATE
+  → Fix the root cause (config change, prompt update, integration fix)
+  → Test the fix in staging
+  → If customer impact: draft and send notification
+  → Document the incident
+
+POST-RESOLUTION:
+  → Agent remains suspended until fix is verified
+  → Post-mortem within 48 hours (use templates/incident-postmortem.md)
+  → Update guardrails/scope to prevent recurrence
+  → Consider tier demotion
+```
 
 ### P1 — High
 
-**Definition:** Agent hallucinated data in a draft, contacted a restricted entity (caught before send), violated brand rules, or produced output that would have caused harm if approved.
+```
+MINUTE 0: DETECT
+  → Alert fires (monitoring, anomaly detection, or human report)
+  → Agent optionally suspended (judgment call by responder)
 
-**Examples:**
-- Agent fabricated statistics in a report draft
-- Agent drafted an email to a blocklisted contact (caught in review)
-- Agent used prohibited language or made prohibited claims in a draft
-- Agent accessed an integration outside its scope
+MINUTE 0-15: ASSESS
+  → Review audit logs for the flagged behavior
+  → Determine: is the agent still producing bad outputs?
+  → Determine: what's the blast radius?
 
-**Response:**
-1. **Pause** the agent (within 30 minutes)
-2. Review last 48 hours of output — check if similar issues went undetected
-3. Identify root cause (stale context, missing guardrail, edge case)
-4. Update guardrails to prevent recurrence
-5. Run targeted dry run on updated guardrails before restart
+MINUTE 15-60: REMEDIATE
+  → Apply fix (prompt adjustment, config change, integration fix)
+  → If agent was suspended: re-deploy with fix, monitor closely
+  → If agent was not suspended: monitor for improvement
 
-**Timeline:** 0–4 hours for pause and review. 24 hours for guardrail update. Restart after validation.
-
----
+POST-RESOLUTION:
+  → Post-mortem within 48 hours for repeated P1s
+  → Update monitoring to catch this pattern earlier
+```
 
 ### P2 — Medium
 
-**Definition:** Agent produced low-quality output, missed relevant context, generated redundant work, or showed degraded judgment.
+```
+HOUR 0-1: ASSESS
+  → Review metrics and logs
+  → Determine: is this trending toward P1?
 
-**Examples:**
-- Agent drafted an email that was factually correct but tonally wrong
-- Agent generated a report missing key data that was available
-- Agent produced duplicate work (re-drafted something already handled)
-- Agent's output quality noticeably declined over a period
+HOUR 1-4: REMEDIATE
+  → Apply fix
+  → Monitor for improvement
 
-**Response:**
-1. Log the issue with specific examples
-2. Update knowledge base or context files to address the gap
-3. Continue operating with enhanced monitoring
-4. Review at next scheduled check-in
-
-**Timeline:** 24 hours for logging and context update. No immediate pause needed.
-
----
+POST-RESOLUTION:
+  → Log the issue and fix
+  → Update monitoring thresholds if needed
+```
 
 ### P3 — Low
 
-**Definition:** Minor formatting, tone, or timing issues. Cosmetic problems. Slightly suboptimal but not harmful output.
+```
+→ Log the issue
+→ Add to backlog
+→ Fix in next maintenance window
+```
 
-**Examples:**
-- Agent used a slightly wrong formatting template
-- Agent sent a heartbeat report 10 minutes late
-- Agent's draft was acceptable but could be improved
-- Agent missed a non-critical context detail
+---
 
-**Response:**
-1. Log for next review cycle
-2. No immediate action required
-3. Batch with similar P3 issues for periodic guardrail refinement
+## Incident Communication
 
-**Timeline:** Next scheduled review.
+### Internal
+
+| Audience | Channel | When |
+|----------|---------|------|
+| Agent owner | Slack DM + PagerDuty (P0/P1) | Immediately on detection |
+| Engineering team | #agent-incidents | P0: immediately, P1: within 15 min |
+| Leadership | Email summary | P0: within 1 hour, P1: daily digest |
+
+### External (if customer-facing agent)
+
+| Severity | Communication |
+|----------|---------------|
+| P0 with customer impact | Proactive notification within 2 hours. Honest, specific, include timeline for resolution. |
+| P1 with customer impact | Notification if impact lasted > 30 minutes. |
+| P2/P3 | No external communication needed unless asked. |
+
+**Template for customer notification:**
+
+```
+Subject: [Agent Name] Service Incident — [Date]
+
+We identified an issue with [agent name] that affected [specific impact].
+
+Timeline:
+- [Time]: Issue detected
+- [Time]: Agent suspended / issue contained
+- [Time]: Fix applied
+- [Time]: Service restored
+
+What happened: [Brief, honest description]
+
+What we're doing: [Prevention measures]
+
+We apologize for the disruption. If you have questions, contact [support channel].
+```
 
 ---
 
 ## Post-Mortem Template
 
-Every P0 and P1 incident generates a post-mortem. Store at `/incidents/[YYYY-MM-DD]_[AGENT]_[SUMMARY].md`.
+Use [`templates/incident-postmortem.md`](../templates/incident-postmortem.md) for all P0 and P1 incidents. Key sections:
 
-Use the [Incident Post-Mortem Template](../templates/incident-postmortem.md).
+1. **Summary** — What happened, in two sentences
+2. **Timeline** — Minute-by-minute from detection to resolution
+3. **Root Cause** — The actual cause, not symptoms
+4. **Impact** — What was affected, for how long, how many users/actions
+5. **What Went Well** — What worked in the response
+6. **What Went Wrong** — Where the response fell short
+7. **Action Items** — Specific, assigned, with deadlines
 
-**Post-mortem must include:**
-1. **Timeline** — minute-by-minute of what happened
-2. **Root cause** — not "the agent hallucinated" but WHY it hallucinated (stale context? missing guardrail? adversarial input? ambiguous instruction?)
-3. **What was missed** — what monitoring or review step should have caught this earlier?
-4. **Impact** — what was the actual damage? Who was affected?
-5. **Remediation** — what specific changes were made to prevent recurrence?
-6. **Validation** — how were the changes tested before the agent was restarted?
+### Post-Mortem Rules
 
-## Incident Tracking
+- **No blame.** Post-mortems are about systems, not people.
+- **Be specific.** "Improve monitoring" is not an action item. "Add alert for error rate > 5% on deploy-bot by June 15" is.
+- **Follow up.** Action items without owners and deadlines don't get done.
+- **Share learnings.** Consider contributing the anonymized pattern to this repo.
 
-Maintain a running incident log:
+---
 
-```markdown
-| Date | Agent | Severity | Summary | Root Cause | Status |
-|------|-------|----------|---------|------------|--------|
-| 2026-06-01 | Viktor | P2 | Missed context in daily brief | Stale channel data | Resolved |
-| 2026-05-28 | ContentBot | P1 | Hallucinated competitor pricing | No source data available | Resolved |
-```
+## Automatic Response Rules
 
-Review this log monthly. Look for patterns:
-- Is one agent responsible for most incidents?
-- Is one integration causing repeated failures?
-- Are incidents concentrated in a specific action class?
-- Is the overall incident rate trending up or down?
+These fire without human intervention:
 
-## Communication During Incidents
+| Trigger | Automatic Response |
+|---------|-------------------|
+| Kill switch triggered | Agent demoted to T0, pending actions cancelled, P0 alert |
+| 5 consecutive errors | Agent suspended, alert owner |
+| Anomaly score > 0.8 | Agent suspended, alert owner |
+| Rejection rate > 20% (2h window) | Agent suspended, alert owner |
+| Heartbeat failure × 3 consecutive | Agent suspended, alert owner |
+| Cross-tenant data access attempt | Agent killed, security alert, P0 |
 
-### P0 — External Communication Required
-- Notify affected external parties within 1 hour
-- Use factual, non-defensive language
-- Explain what happened, what you're doing about it, and when you'll follow up
-- Do not blame the AI — you deployed it, you're responsible
+---
 
-### P1 — Internal Communication Required
-- Notify the team within 4 hours
-- Share the root cause and remediation plan
-- No external communication needed unless the draft was nearly sent
+## Recovery Checklist
 
-### P2/P3 — Log Only
-- Document in the incident log
-- Discuss at next team review if pattern emerges
+Before restarting a suspended agent:
+
+- [ ] Root cause identified
+- [ ] Fix applied and tested in staging
+- [ ] Audit logs reviewed for the incident period
+- [ ] No ongoing impact
+- [ ] Agent restarted at current or lower tier (never promoted during recovery)
+- [ ] Enhanced monitoring active for 48 hours post-restart
+- [ ] Post-mortem scheduled (P0/P1) or issue logged (P2/P3)
+
+---
+
+→ Back to: [Deployment Checklist](03-deployment-checklist.md) · [Monitoring Protocol](04-monitoring-protocol.md)

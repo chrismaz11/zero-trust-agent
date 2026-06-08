@@ -1,0 +1,100 @@
+# ============================================================
+# Proactive Watcher Configuration Template
+# ============================================================
+# Copy this file and customize for each watcher your agent needs.
+# See architecture/proactive-engine.md for full documentation.
+# ============================================================
+
+watchers:
+  - name: "your-watcher-name"             # lowercase, hyphens, unique per agent
+    description: "What this watcher monitors and why"
+    enabled: true                           # set false to disable without removing
+
+    # ── DATA SOURCE ──────────────────────────────────────────
+    # What the watcher monitors. Choose one type.
+    data_source:
+      type: "database"                      # database | api | metrics | logs | events
+      # For database:
+      # connection: "postgres://..."
+      # query: "SELECT ... WHERE ..."
+      # For API:
+      # endpoint: "https://api.example.com/health"
+      # method: GET
+      # headers: { "Authorization": "Bearer {{secret:api_key}}" }
+      # For metrics:
+      # provider: "prometheus"              # prometheus | datadog | cloudwatch
+      # metric: "http_error_rate"
+      poll_interval: 300                    # seconds between checks (for polling)
+      # trigger: "event.name"              # uncomment for event-driven watchers
+
+    # ── DETECTION RULES ──────────────────────────────────────
+    # When to fire. Multiple rules = OR logic (any rule triggers the watcher).
+    detection:
+      rules:
+        - type: "threshold"                 # threshold | anomaly | pattern | schedule
+          metric: "error_rate"
+          operator: ">"                     # > | < | == | != | between
+          value: 0.05
+          window: 3600                      # lookback window in seconds
+
+        # - type: "anomaly"
+        #   metric: "request_volume"
+        #   deviation: 2.5                  # standard deviations from baseline
+        #   baseline_period: "7d"           # how much history to use for baseline
+
+        # - type: "pattern"
+        #   event: "deploy.failed"
+        #   count: 3                        # N occurrences
+        #   window: 3600                    # within this window (seconds)
+        #   group_by: "service_name"        # optional grouping
+
+    # ── RECOMMENDATION ───────────────────────────────────────
+    # What the watcher suggests when detection fires.
+    recommendation:
+      template: |
+        **{{watcher_name}} Alert**
+        
+        Detected: {{detection_summary}}
+        Severity: {{priority}}
+        
+        Recommended action: {{recommended_action}}
+        
+        Context:
+        {{context_details}}
+
+      actions:
+        - type: "notify_team"               # what action to recommend
+          condition: "always"               # when to recommend this action
+        # - type: "rollback"
+        #   condition: "error_rate > 0.15"
+        # - type: "scale_up"
+        #   condition: "capacity > 80%"
+
+    # ── DELIVERY ─────────────────────────────────────────────
+    # How and where to deliver the recommendation.
+    delivery:
+      channels:
+        - type: "slack"
+          target: "#alerts-channel"
+        # - type: "email"
+        #   target: "oncall@yourcompany.com"
+        # - type: "pagerduty"
+        #   service_id: "PXXXXXX"
+        # - type: "webhook"
+        #   url: "https://hooks.example.com/alerts"
+
+      priority_map:                         # map conditions to priority levels
+        default: P2
+        # "error_rate > 0.15": P0
+        # "error_rate > 0.05": P1
+
+      quiet_hours: "22:00-07:00"            # suppress non-P0 alerts during these hours
+      timezone: "UTC"
+
+    # ── GOVERNANCE ───────────────────────────────────────────
+    # The watcher inherits this tier for any actions it proposes.
+    governance:
+      tier: T1                              # T0 | T1 | T2 | T3
+      # At T1: recommendations are drafted for human approval
+      # At T2: approved action classes auto-execute
+      # Watchers should rarely be above T2

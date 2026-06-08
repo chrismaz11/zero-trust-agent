@@ -1,128 +1,189 @@
 # Permission Tiers
 
-Every agent operates at exactly one tier. The tier defines what the agent can do, what approval is required, and what monitoring is in place.
+> The four-tier model defines what an agent can do at each trust level and the requirements for promotion between tiers.
+
+---
 
 ## The Four Tiers
 
 ### T0 — Observer
 
-**Capability:** Read integrations, analyze data, surface findings.
+**Read-only access.** The agent can ingest data, run analysis, and surface findings — but cannot create drafts, trigger actions, or communicate externally.
 
-**Approval:** None required. The agent only reads — it cannot modify, send, or create anything.
+**Use cases:** Data monitoring, anomaly detection, reporting dashboards, internal analytics.
 
-**Monitoring:** Standard heartbeat. Log all read operations for audit trail.
+```yaml
+tier: T0
+permissions:
+  read: [database, api, logs, metrics]
+  draft: []
+  execute: []
+human_involvement: none_required  # read-only is safe
+```
 
-**Use cases:**
-- Monitoring channels for activity patterns
-- Analyzing data and generating internal reports
-- Research and competitive intelligence gathering
-- Compliance scanning and risk detection
-
-**Promotion criteria:** N/A — T0 is not a stepping stone. Some agents should stay at T0 permanently. A monitoring agent that escalates findings to humans is doing its job at T0.
+**Promotion criteria to T1:**
+- Scope document completed and reviewed
+- System prompt written with guardrails section
+- Approval workflow configured
+- Audit logging confirmed operational
 
 ---
 
 ### T1 — Drafter
 
-**Capability:** Read + generate drafts (emails, messages, PRs, documents, reports).
+**Read + draft.** The agent generates proposed actions (emails, messages, code changes, orders) but every output requires per-item human approval before execution.
 
-**Approval:** Per-item human approval before any output leaves the system.
+**Use cases:** Email drafting, PR descriptions, outreach messages, report generation, content creation.
 
-**Monitoring:** Standard heartbeat + approval queue tracking. Alert if pending drafts exceed 48 hours.
+```yaml
+tier: T1
+permissions:
+  read: [crm, email, calendar, codebase]
+  draft: [email, slack_message, pull_request]
+  execute: []  # everything requires human approval
+  
+approval:
+  mode: per_item
+  reviewers: [lead_dev, product_manager]
+  notify_via: [slack, email]
+  auto_reject_after: 48h  # stale drafts expire
+```
 
-**Use cases:**
-- Outreach email drafting
-- Content generation (blog posts, social media, documentation)
-- Code review comments and PR descriptions
-- Report generation and data summaries
-- Meeting prep and briefing documents
-
-**This is the default tier.** All new agents start here. T1 is not a limitation — it's the correct operating mode for most agent deployments. The value of an agent that drafts well and surfaces the right information at the right time is enormous. Do not rush past T1.
-
-**Promotion criteria:** 30 days of clean operation with:
-- Zero P0 or P1 incidents
-- Documented approval history (>90% approval rate)
-- Owner attestation that the agent's judgment is reliable for specific action classes
-- Defined rollback procedure for each action class being promoted
+**Promotion criteria to T2:**
+- Minimum 2 weeks operating at T1
+- Rejection rate below 5% (measured over last 100 drafts)
+- Zero P0/P1 incidents
+- Audit log reviewed by designated owner
+- Tier promotion documented with justification
 
 ---
 
 ### T2 — Executor
 
-**Capability:** Read + draft + execute pre-approved action classes.
+**Read + draft + execute approved action classes.** The agent can autonomously execute a pre-defined set of actions without per-item approval. Actions outside the approved set still require human review.
 
-**Approval:** Blanket approval for defined action classes. Anything outside those classes still requires per-item approval. Exceptions always escalate.
+**Use cases:** Automated CI/CD workflows, routine customer responses matching approved templates, scheduled report distribution, standard data pipeline operations.
 
-**Monitoring:** Enhanced heartbeat + anomaly detection. Real-time alerts for actions outside approved classes. Weekly review of all executed actions.
+```yaml
+tier: T2
+permissions:
+  read: [crm, email, calendar, codebase, metrics]
+  draft: [email, slack_message, pull_request, report]
+  execute:
+    - type: email_response
+      conditions:
+        template: [acknowledgment, status_update, scheduling]
+        confidence_min: 0.90
+    - type: pr_merge
+      conditions:
+        all_checks_pass: true
+        approved_by_human: true  # code review still required
+    - type: deploy_staging
+      conditions:
+        branch: main
+        tests_pass: true
 
-**Use cases:**
-- Scheduled report delivery (same format, same recipients, same cadence)
-- Routine code commits (formatting, dependency updates, generated files)
-- Status update messages to defined channels
-- Data pipeline operations with known input/output patterns
+approval:
+  mode: class_based          # approved action classes execute automatically
+  escalate_on: [new_action_type, low_confidence, threshold_exceeded]
+  reviewers: [lead_dev]
+```
 
-**Action class definition:** An action class is a specific, bounded category of action with predictable inputs and outputs. Examples:
-- "Send daily standup summary to #engineering at 9 AM CT"
-- "Commit dependency update PRs for non-breaking version bumps"
-- "Post weekly metrics digest to #leadership"
-
-Each action class must be documented with:
-- What triggers it
-- What the expected output looks like
-- What constitutes an anomaly (and triggers escalation)
-- How to roll it back if something goes wrong
-
-**Promotion criteria:** 60 days of clean T2 operation with:
-- Zero incidents across all action classes
-- Automated rollback capability tested and documented
-- Real-time monitoring with sub-5-minute anomaly detection
-- Owner acceptance of full autonomous operation risk
+**Promotion criteria to T3:**
+- Minimum 30 days operating at T2
+- Zero P0/P1 incidents during T2 period
+- Incident response plan documented and tested
+- Kill switch tested (verified working)
+- Anomaly detection configured and validated
+- Business owner sign-off on scope expansion
 
 ---
 
 ### T3 — Autonomous
 
-**Capability:** Full operational authority within scoped boundaries.
+**Full authority within scoped boundaries.** The agent operates independently. Oversight shifts from pre-approval to post-hoc audit and anomaly-triggered alerts.
 
-**Approval:** Post-hoc audit. Real-time alerts on anomalies.
+**Use cases:** Production operations agents, fully automated customer communication pipelines, autonomous DevOps agents managing infrastructure.
 
-**Monitoring:** Continuous monitoring with automated anomaly detection. Every action logged and scored. Weekly audit review. Monthly scope reassessment.
+```yaml
+tier: T3
+permissions:
+  read: [all_scoped_systems]
+  draft: [all_scoped_outputs]
+  execute: [all_scoped_actions]
 
-**Use cases:**
-- High-frequency, well-tested workflows with established patterns
-- Time-sensitive operations where human approval would create unacceptable delay
-- Operations with complete automated rollback capability
+oversight:
+  mode: post_hoc_audit
+  audit_frequency: daily
+  anomaly_detection:
+    enabled: true
+    triggers:
+      - action_volume_spike: 3x_baseline
+      - new_target_contacted: true
+      - error_rate_above: 0.05
+      - spend_above_daily: 1000
+  alert_on_anomaly: [slack, pagerduty]
+  
+kill_switch:
+  enabled: true  # always true for T3
+  manual_trigger: /api/agents/{id}/kill
+  automatic_triggers:
+    - consecutive_errors: 5
+    - anomaly_score_above: 0.8
+```
 
-**⚠️ T3 is rare.** Most agents should never reach T3. The bar is intentionally high because the risk of autonomous operation is real. A T3 agent that makes a mistake doesn't have a human catching it in real-time.
-
-**Requirements for T3:**
-- Automated rollback for every action the agent can take
-- Real-time anomaly detection with automatic pause capability
-- Complete audit trail with automated compliance checking
-- Quarterly scope review with owner sign-off
-- Defined demotion criteria (what causes automatic drop to T2)
+**T3 is not a goal — it's a tool.** Most agents should operate at T1 or T2. T3 is reserved for well-understood, highly repetitive workflows where the cost of human review exceeds the risk of autonomous execution.
 
 ---
 
-## Tier Movement
+## Tier Promotion Process
 
-### Promotion
-1. Owner initiates promotion request with justification
-2. Review last 30/60 days of operation logs
-3. Verify zero qualifying incidents in the review period
-4. Document the specific capabilities being promoted
-5. Define rollback procedures for new capabilities
-6. Update scope document with new tier and effective date
-7. Set review date (30 days for T1→T2, 60 days for T2→T3)
+```
+Step 1: Document the promotion request
+        - Current tier and requested tier
+        - Duration at current tier
+        - Performance metrics (rejection rate, error rate, incident count)
+        - Justification for expanded permissions
+
+Step 2: Review audit logs
+        - Verify claimed metrics against actual logs
+        - Check for any suppressed or ignored alerts
+        - Confirm zero unresolved incidents
+
+Step 3: Test guardrails at new tier
+        - Dry run with new permissions in staging
+        - Verify kill switch works
+        - Verify escalation rules fire correctly
+
+Step 4: Approve and log
+        - Promotion approved by designated owner
+        - New tier configuration deployed
+        - Promotion event written to audit log with full context
+```
 
 ### Demotion
-Demotion is immediate when triggered. No review period required.
 
-**Automatic demotion triggers:**
-- Any P0 incident → Immediate drop to T0 (paused)
-- Any P1 incident → Drop to T1 (draft-only)
-- Owner request → Immediate, any tier
-- Scope document expiry → Drop to T1 until renewal
+Tier demotions are immediate and do not require a review process:
+- Any P0 incident → automatic demotion to T0 (suspended)
+- Any P1 incident → demotion to T1 pending review
+- Rejection rate above 15% for 7 consecutive days → demotion to prior tier
+- Kill switch triggered → T0 until manual review complete
 
-### Lateral Movement
-An agent's tier applies to its entire scope. You cannot have a T2 agent that's T3 for one integration and T1 for another. If you need different tiers for different workflows, deploy separate agents.
+---
+
+## Quick Reference
+
+| | T0 Observer | T1 Drafter | T2 Executor | T3 Autonomous |
+|---|---|---|---|---|
+| Read data | ✅ | ✅ | ✅ | ✅ |
+| Generate drafts | ❌ | ✅ | ✅ | ✅ |
+| Execute (with approval) | ❌ | ✅ | ✅ | ✅ |
+| Execute (autonomous) | ❌ | ❌ | ✅ (defined classes) | ✅ (full scope) |
+| Human review | N/A | Per item | Per exception | Post-hoc audit |
+| Kill switch required | No | No | Yes | Yes |
+| Anomaly detection | Optional | Optional | Recommended | Required |
+| Minimum time before promotion | — | 2 weeks | 30 days | — |
+
+---
+
+→ Next: [Deployment Checklist](03-deployment-checklist.md)

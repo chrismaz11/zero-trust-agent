@@ -1,142 +1,156 @@
 # Monitoring Protocol
 
-Every active agent runs scheduled health checks. Monitoring is not optional — an unmonitored agent is an ungoverned agent.
+> How to monitor agent health, detect problems early, and ensure governance is working.
 
-## Heartbeat Schedule
+---
 
-| Agent Tier | Minimum Frequency | Alert Channel |
-|-----------|-------------------|---------------|
-| T0 — Observer | Daily | Log only |
-| T1 — Drafter | Daily | Owner DM |
-| T2 — Executor | Twice daily | Owner DM + team channel |
-| T3 — Autonomous | Continuous (5-min intervals) | Owner DM + team channel + PagerDuty |
+## Heartbeat Monitoring
 
-## Health Check Matrix
+Every production agent runs a periodic health check. The heartbeat verifies the agent is alive, logging, and operating within expected parameters.
 
-Each heartbeat verifies the following:
-
-### 1. Integration Connectivity
-
-**What it checks:** All granted integrations respond within acceptable latency.
-
-**Pass criteria:** Every integration returns a valid response within 10 seconds.
-
-**Failure action:**
-- Alert the owner with specific integration(s) that failed
-- Pause workflows that depend on the failed integration
-- Retry once after 5 minutes
-- If retry fails, escalate and remain paused
-
-### 2. Knowledge Base Freshness
-
-**What it checks:** Context files have been updated within the defined staleness window.
-
-**Pass criteria:** No context file older than the configured threshold (default: 30 days).
-
-**Failure action:**
-- Flag stale files in the heartbeat report
-- Continue operating but mark outputs as "stale context" risk
-- Request owner to review and update context files
-
-### 3. Approval Queue Depth
-
-**What it checks:** No pending drafts older than the configured timeout.
-
-**Pass criteria:** All pending items are younger than 48 hours (configurable).
-
-**Failure action:**
-- Alert owner about aging items
-- If items exceed 72 hours, escalate to backup approver (if configured)
-- Do not auto-approve. Ever.
-
-### 4. Error Rate
-
-**What it checks:** Percentage of failed actions over the last 24 hours.
-
-**Pass criteria:** Error rate below configured threshold (default: 5%).
-
-**Failure action:**
-- If error rate exceeds threshold, auto-pause the agent
-- Alert owner with error summary and most common failure types
-- Require manual restart after root cause review
-
-### 5. Output Quality Spot Check
-
-**What it checks:** Random sample of recent outputs against quality criteria.
-
-**Pass criteria:** Sampled outputs meet accuracy, relevance, and tone standards.
-
-**Failure action:**
-- Flag anomalous outputs for manual review
-- If pattern detected, update guardrails or knowledge base
-- Document findings in the agent's operation log
-
-## Heartbeat Report Format
+### Heartbeat Configuration
 
 ```yaml
-# Heartbeat Report
-agent: [AGENT_NAME]
-timestamp: 2026-06-06T14:00:00Z
-tier: T1
-
-checks:
-  integration_connectivity:
-    status: pass | fail | degraded
-    details:
-      - integration: slack
-        status: pass
-        latency_ms: 120
-      - integration: github
-        status: pass
-        latency_ms: 340
-
-  knowledge_freshness:
-    status: pass | warn | fail
-    stale_files: []
-    oldest_file:
-      path: /context/company.md
-      last_updated: 2026-05-28T10:00:00Z
-      age_days: 9
-
-  approval_queue:
-    status: pass | warn | fail
-    pending_count: 2
-    oldest_pending:
-      age_hours: 4
-      summary: "Draft email to [RECIPIENT]"
-
-  error_rate:
-    status: pass | warn | fail
-    rate_24h: 1.2%
-    total_actions: 84
-    failures: 1
-
-  quality_check:
-    status: pass | warn | review_needed
-    sample_size: 5
-    flagged: 0
-
-overall: healthy | degraded | critical | paused
-next_check: 2026-06-07T14:00:00Z
+# See templates/heartbeat-config.yaml for the full template
+heartbeat:
+  interval: 300                    # seconds (5 minutes)
+  
+  checks:
+    - name: agent_alive
+      test: "Agent process is responsive"
+      method: ping | health_endpoint | process_check
+      
+    - name: audit_log_active
+      test: "Agent has written a log entry in the last interval"
+      method: query_last_log_timestamp
+      
+    - name: error_rate
+      test: "Error rate is below threshold"
+      method: count_errors_in_window
+      threshold: 0.05              # 5%
+      window: 3600                 # 1 hour
+      
+    - name: action_rate
+      test: "Action rate is within expected range"
+      method: count_actions_in_window
+      min: 0                       # 0 = agent may be idle (okay for some agents)
+      max: 500                     # suspiciously high = possible loop
+      window: 3600
+      
+    - name: rejection_rate
+      test: "Approval rejection rate is below threshold"
+      method: count_rejections / count_drafts
+      threshold: 0.15              # 15% — rising rejections indicate quality drop
+      window: 86400                # 24 hours
 ```
 
-## Alert Escalation
+### Health Scoring
 
-| Condition | First Alert | Escalation (if unresolved 1h) | Auto-Action |
-|-----------|------------|-------------------------------|-------------|
-| Integration down | Owner DM | Team channel | Pause affected workflows |
-| Error rate >5% | Owner DM | Team channel | Auto-pause agent |
-| Error rate >15% | Owner DM + team | Immediate escalation | Kill switch |
-| Approval queue >48h | Owner DM | Backup approver | None (never auto-approve) |
-| Stale context >30d | Owner DM | None | Flag outputs as "stale context" |
-| Quality anomaly | Owner DM | None | Flag for manual review |
+Each heartbeat produces a health score:
 
-## Dashboard Recommendations
+| Score | Status | Meaning | Action |
+|-------|--------|---------|--------|
+| 100 | 🟢 Healthy | All checks passing | None |
+| 75–99 | 🟡 Degraded | 1–2 non-critical checks failing | Investigate within 1 hour |
+| 50–74 | 🟠 Warning | Critical check failing or multiple non-critical | Alert owner, investigate immediately |
+| 0–49 | 🔴 Critical | Agent unresponsive or severe anomaly | Auto-suspend, page on-call |
 
-If operating more than 3 agents, build a monitoring dashboard that shows:
+### Alerting
 
-1. **Agent status grid** — all agents, current tier, current health status
-2. **Approval queue** — pending items across all agents, sorted by age
-3. **Error timeline** — error rate over time per agent
-4. **Action volume** — actions per day per agent (spot trend changes)
-5. **Incident log** — recent P0–P3 incidents with resolution status
+```yaml
+alerting:
+  channels:
+    - slack: "#agent-health"              # all health updates
+    - pagerduty: "agent-incidents"        # P0/P1 only
+    - email: "agent-owner@company.com"    # daily digest
+  
+  rules:
+    - condition: health_score < 75
+      action: alert_slack
+      
+    - condition: health_score < 50
+      action: [alert_slack, page_oncall]
+      
+    - condition: consecutive_failures >= 3
+      action: [suspend_agent, alert_all]
+      
+    - condition: agent_unresponsive > 600   # 10 minutes
+      action: [suspend_agent, page_oncall]
+```
+
+---
+
+## Key Metrics to Track
+
+### Operational Metrics
+
+| Metric | What It Tells You | Alert Threshold |
+|--------|------------------|-----------------|
+| **Action count** (by type) | How busy the agent is | Spike > 3x baseline |
+| **Error rate** | How often actions fail | > 5% |
+| **Response time** | How fast the agent processes requests | > 2x baseline |
+| **Queue depth** | How many pending actions are waiting | Growing over time |
+| **Uptime** | Agent availability | < 99.5% over 7 days |
+
+### Governance Metrics
+
+| Metric | What It Tells You | Alert Threshold |
+|--------|------------------|-----------------|
+| **Approval rate** | How often drafts are approved | < 85% (investigate quality) |
+| **Rejection rate** | How often drafts are rejected | > 15% (quality degradation) |
+| **Time-to-approval** | How long drafts wait for review | > 4 hours (reviewer bottleneck) |
+| **Escalation rate** | How often the agent escalates to humans | Rising trend (scope may need adjustment) |
+| **Guardrail trigger rate** | How often blocklists/limits are hit | Any spike (investigate cause) |
+
+### Proactive Engine Metrics (if using watchers)
+
+| Metric | What It Tells You | Alert Threshold |
+|--------|------------------|-----------------|
+| **Alert volume** | How many proactive events fired | Spike > 3x baseline (noisy watchers) |
+| **Alert action rate** | How often alerts are acted on | < 30% (alerts may not be useful) |
+| **Alert dismiss rate** | How often alerts are dismissed | > 70% (watcher thresholds too sensitive) |
+| **False positive rate** | Alerts that turned out to be nothing | > 50% (detection logic needs tuning) |
+
+---
+
+## Dashboard Setup
+
+Recommended dashboard layout:
+
+```
+┌─────────────────────────────────────────────────────────┐
+│  AGENT HEALTH OVERVIEW                                  │
+│  ┌─────────┐ ┌─────────┐ ┌─────────┐ ┌─────────┐     │
+│  │ Agent A  │ │ Agent B  │ │ Agent C  │ │ Agent D  │     │
+│  │ 🟢 100   │ │ 🟡 82    │ │ 🟢 97    │ │ 🔴 23    │     │
+│  └─────────┘ └─────────┘ └─────────┘ └─────────┘     │
+├─────────────────────────────────────────────────────────┤
+│  ACTION VOLUME (24h)          │  ERROR RATE (24h)       │
+│  ▁▂▃▅▇▅▃▂▁▂▃▅▇▅▃            │  ▁▁▁▁▂▁▁▁▁▁▁▁▁▁▁▁      │
+├───────────────────────────────┼─────────────────────────┤
+│  APPROVAL RATE (7d)           │  ESCALATION RATE (7d)   │
+│  ████████████░░ 87%           │  ██░░░░░░░░░░░░ 12%     │
+├─────────────────────────────────────────────────────────┤
+│  RECENT EVENTS                                          │
+│  10:15  Agent B  email.drafted       pending_approval   │
+│  10:12  Agent A  deploy.triggered    success             │
+│  10:08  Agent C  anomaly.detected    escalated           │
+│  10:01  Agent D  kill_switch         suspended            │
+└─────────────────────────────────────────────────────────┘
+```
+
+---
+
+## Monitoring Cadence
+
+| Frequency | What to Check |
+|-----------|---------------|
+| **Real-time** | Heartbeat status, kill switch alerts, P0 incidents |
+| **Hourly** | Error rate, action volume, queue depth |
+| **Daily** | Approval/rejection rates, escalation patterns, audit log review |
+| **Weekly** | Trend analysis, watcher effectiveness, governance metrics |
+| **Monthly** | Tier review, scope document currency, incident retrospective |
+
+---
+
+→ Next: [Incident Response](05-incident-response.md)

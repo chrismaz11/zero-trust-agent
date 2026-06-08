@@ -1,144 +1,119 @@
 # Deployment Checklist
 
-Complete every item before an agent goes live. This checklist is the minimum standard — not a suggestion list. Skip a step and you're shipping ungoverned automation.
+> Walk through every item before deploying an agent to production. No shortcuts.
 
 ---
 
-## 01 — Define the Agent's Scope Document
+## Pre-Deployment (8 Steps)
 
-Fill out the [Agent Scope Document template](../templates/agent-scope-document.md). This is the agent's constitution — everything it can and cannot do is here.
+### Step 1: Define Scope ✎
 
-**Verify:**
-- [ ] Agent name and one-sentence purpose are clear and specific
-- [ ] Operating environment is defined (platform, tools, infrastructure)
-- [ ] Access tier is set (default: T1 — Drafter)
-- [ ] Owner is named (the human accountable for this agent)
-- [ ] Status is set to `draft` until deployment is complete
+- [ ] Agent scope document completed ([`templates/agent-scope-document.md`](../templates/agent-scope-document.md))
+- [ ] Single-sentence purpose defined
+- [ ] All integrations listed with specific permission levels (read/draft/execute)
+- [ ] Explicit list of forbidden actions
+- [ ] Agent owner identified and confirmed
+- [ ] Review cadence agreed (weekly? bi-weekly?)
 
----
+### Step 2: Map Integrations 🔗
 
-## 02 — Enumerate Integrations and Permission Boundaries
+- [ ] Every external system the agent touches is documented
+- [ ] API credentials provisioned with minimum necessary scopes
+- [ ] Credentials stored in vault (never in code, never in environment files committed to git)
+- [ ] Rate limits understood for each external API
+- [ ] Fallback behavior defined for each integration (what happens if the API is down?)
 
-List every integration the agent touches. For each integration, document:
-- What data it can read
-- What actions it can propose (at T1) or execute (at T2+)
-- What is explicitly forbidden
+### Step 3: Write System Prompt 📝
 
-**Verify:**
-- [ ] Every integration is listed with explicit scope
-- [ ] Read vs. write permissions are distinguished
-- [ ] Forbidden actions are documented (not just allowed ones)
-- [ ] No implicit access — if it's not listed, it's denied
-- [ ] Integration credentials are managed securely (no hardcoded keys)
+- [ ] System prompt written using [`templates/system-prompt-skeleton.md`](../templates/system-prompt-skeleton.md)
+- [ ] Identity section matches scope document
+- [ ] Permission section explicitly states what the agent can and cannot do
+- [ ] Guardrails section includes blocklists, rate limits, escalation triggers
+- [ ] Failure mode section defines behavior for errors, low confidence, and unknown situations
+- [ ] System prompt reviewed by someone other than the author
 
----
+### Step 4: Build Knowledge Base 📚
 
-## 03 — Write the System Prompt with Guardrails
+- [ ] Agent has access to all reference material it needs (docs, FAQs, policies)
+- [ ] Knowledge base is scoped — agent can only access documents relevant to its task
+- [ ] If using RAG: embeddings generated, retrieval tested with sample queries
+- [ ] Knowledge base update process defined (who updates? how often?)
 
-Use the [System Prompt Skeleton](../templates/system-prompt-skeleton.md) as your scaffold. The system prompt is the agent's operating manual.
+### Step 5: Configure Approval Workflow ✅
 
-**Verify:**
-- [ ] Purpose section is specific (not "be helpful")
-- [ ] Access permissions match the scope document exactly
-- [ ] Blocklist is populated (names, domains, resources the agent must never touch)
-- [ ] Prohibited claims are defined (what the agent must never assert)
-- [ ] Escalation triggers are specific and actionable
-- [ ] Failure modes are defined (what happens when things go wrong)
-- [ ] Brand language rules are included if the agent produces external-facing content
-- [ ] System prompt has been tested with adversarial inputs
+- [ ] Approval mode matches the agent's tier (per-item for T1, class-based for T2)
+- [ ] Reviewers identified and notified of their responsibility
+- [ ] Notification channel configured (Slack, email, dashboard)
+- [ ] Timeout behavior defined (auto-reject? escalate? remind?)
+- [ ] Rejection workflow defined (reviewer provides reason, agent logs it)
+- [ ] Test: submit a mock draft, verify the approval flow end-to-end
 
----
+### Step 6: Set Up Audit Logging 📋
 
-## 04 — Build the Knowledge Base
+- [ ] Log schema matches [`templates/audit-log-schema.json`](../templates/audit-log-schema.json)
+- [ ] Logs are append-only (no UPDATE or DELETE permissions)
+- [ ] Log entries are cryptographically signed
+- [ ] Test: write a log entry, verify it's readable and complete
+- [ ] Dual storage configured (primary DB + backup log sink)
+- [ ] Log retention policy set (minimum 365 days)
 
-Assemble the context files the agent needs. Version-control everything. The agent's quality ceiling is the quality of its context.
+### Step 7: Dry Run 🧪
 
-**Verify:**
-- [ ] Company context document exists and is current
-- [ ] Brand rules are documented (if applicable)
-- [ ] Domain-specific knowledge is structured and accessible
-- [ ] Context files are version-controlled
-- [ ] Stale context detection is configured (flag files not updated in >30 days)
-- [ ] No sensitive information in context files that shouldn't be in the agent's scope
+- [ ] Agent deployed in staging/sandbox environment
+- [ ] Run at least 20 representative scenarios
+- [ ] Verify: correct intents identified
+- [ ] Verify: correct actions proposed
+- [ ] Verify: guardrails triggered when they should be (test edge cases)
+- [ ] Verify: audit logs capture full decision chain
+- [ ] Verify: approval workflow functions correctly
+- [ ] Review all draft outputs for quality, tone, and accuracy
 
----
+### Step 8: Kill Switch 🔴
 
-## 05 — Configure Approval Workflow
-
-Define how drafts surface for human review. The approval step is the critical control point — make it frictionless or it won't get used.
-
-**Options:**
-- Slack thread with approve/reject reactions or buttons
-- GitHub PR review workflow
-- Email digest with action links
-- Custom dashboard with approval queue
-
-**Verify:**
-- [ ] Approval channel is defined and accessible to the owner
-- [ ] Approve, reject, and edit flows are tested
-- [ ] Approval timeout is set (what happens if no one reviews within X hours)
-- [ ] Bulk approval is available for routine items (at T2+)
-- [ ] Rejection triggers feedback to the agent (for learning)
+- [ ] Kill switch endpoint/mechanism configured
+- [ ] Kill switch tested (trigger it, verify agent stops, verify pending actions cancelled)
+- [ ] Kill switch is accessible to agent owner AND a backup person
+- [ ] Automatic kill triggers configured (consecutive errors, anomaly detection)
+- [ ] Kill switch fires in under 60 seconds
+- [ ] Kill event is logged
 
 ---
 
-## 06 — Set Up Logging and Audit Trail
+## Go-Live
 
-Every agent action must be logged. See [Audit Log Schema](../templates/audit-log-schema.json) for the format.
-
-**Verify:**
-- [ ] Log pipeline is configured and tested
-- [ ] Every action type is captured (read, draft, send, error, approval)
-- [ ] Logs include timestamp, agent ID, action type, input summary, output summary, approval status
-- [ ] Logs are immutable (append-only storage)
-- [ ] Retention period matches compliance requirements
-- [ ] Log query capability exists (you can search and filter historical actions)
-- [ ] Sensitive data is redacted from logs (PII, credentials)
+- [ ] Agent deployed at T0 or T1 (never higher for first production deployment)
+- [ ] Heartbeat monitoring active ([`framework/04-monitoring-protocol.md`](04-monitoring-protocol.md))
+- [ ] Incident response plan written and reviewed ([`framework/05-incident-response.md`](05-incident-response.md))
+- [ ] On-call person identified for the first 7 days
+- [ ] First-week review scheduled (review logs, approval history, and performance)
 
 ---
 
-## 07 — Run a Dry-Run Period
+## Post-Launch (First Week)
 
-Operate the agent in draft-only mode for a minimum of 7 days. Review every output.
-
-**Verify:**
-- [ ] Agent is set to T1 (Drafter) regardless of target tier
-- [ ] Every output is reviewed by the owner during dry run
-- [ ] Accuracy is tracked (% of outputs that are correct and useful)
-- [ ] False positives are documented (agent flagged something incorrectly)
-- [ ] Hallucinations are documented (agent fabricated information)
-- [ ] Edge cases are documented and guardrails updated
-- [ ] Dry-run report is written with go/no-go recommendation
-- [ ] Minimum 7 days completed with no P0 or P1 issues
+- [ ] Review all audit logs daily
+- [ ] Track rejection rate (target: understand why rejections happen)
+- [ ] Verify heartbeat has been clean (no missed checks)
+- [ ] Check for any guardrail triggers (were they appropriate?)
+- [ ] Gather feedback from reviewers (is the approval workflow working?)
+- [ ] Document any scope adjustments needed
+- [ ] Schedule tier promotion review (if applicable) for day 14+
 
 ---
 
-## 08 — Document the Kill Switch
+## Tier Promotion Checklist (T1 → T2)
 
-Define how to immediately disable the agent. This must be a single action.
+Only after 2+ weeks at T1:
 
-**Options:**
-- Pause the cron schedule
-- Revoke the API key
-- Disable the integration
-- Set agent status to `paused` in scope document
-
-**Verify:**
-- [ ] Kill switch is documented in the scope document
-- [ ] Kill switch is a single action (not a multi-step process)
-- [ ] Kill switch has been tested (actually triggered and confirmed working)
-- [ ] Kill switch is accessible to the owner at any time (not behind auth that might fail)
-- [ ] Recovery procedure is documented (how to safely restart after kill switch)
+- [ ] Rejection rate < 5% over last 100 drafts
+- [ ] Zero P0/P1 incidents during T1 period
+- [ ] Audit log reviewed and clean
+- [ ] Specific auto-approved action classes identified and documented
+- [ ] Kill switch re-tested
+- [ ] Anomaly detection configured for T2 operation
+- [ ] Promotion approved by agent owner
+- [ ] Promotion event logged in audit trail
 
 ---
 
-## Go-Live Checklist
-
-Before promoting from dry run to live:
-
-- [ ] All 8 sections above are complete
-- [ ] Scope document is finalized and version-controlled
-- [ ] Dry-run report shows acceptable performance
-- [ ] Owner has signed off on go-live
-- [ ] First review date is scheduled (7 days post-launch)
-- [ ] Scope document status changed from `draft` to `active`
+→ Next: [Monitoring Protocol](04-monitoring-protocol.md)

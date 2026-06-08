@@ -1,73 +1,199 @@
 # Core Principles
 
-The zero-trust agent framework is built on five non-negotiable principles. Every decision — from system prompt design to incident response — flows from these.
+> The zero-trust agent framework is built on five non-negotiable principles. Every template, checklist, and architecture decision in this repo traces back to these.
 
-## 1. Zero Trust by Default
+---
 
-Every agent starts with **no permissions**. Access is granted explicitly, documented in the scope document, and auditable at any time.
+## Principle 1: Zero Trust by Default
 
-This is the opposite of how most teams deploy agents. The default approach is "give the agent access to everything and hope the system prompt keeps it in line." That works until it doesn't — and when it doesn't, you have no idea what the agent accessed, modified, or sent.
+**Every agent starts with no permissions.**
 
-**In practice:**
-- New agents begin at T0 (Observer) or T1 (Drafter)
-- Each integration is granted individually with explicit scope
-- If an integration isn't listed in the scope document, the agent doesn't have access
-- Permission escalation requires documented justification and owner approval
+Trust is not assumed — it is earned incrementally through demonstrated reliability, explicitly granted through auditable configuration, and continuously verified through monitoring.
 
-## 2. The Agent Drafts. The Human Decides.
+In practice:
+- New agents deploy at T0 (Observer) or T1 (Drafter)
+- Permission grants are documented in the agent's scope document
+- Each integration, API, and data source requires an explicit access grant
+- "The agent needs it" is not a sufficient justification — "the agent needs it for [specific task], reviewed by [person], on [date]" is
 
-No agent sends an email, publishes content, commits code, or spends money without human approval. Period.
+### Why This Matters for Developers
 
-This isn't a philosophical stance — it's a risk management decision. AI agents hallucinate. They misread context. They confidently produce wrong answers. The approval step is the firewall between "the agent thinks this is right" and "this goes to a real person."
+When you're building fast, it's tempting to give your agent broad permissions to reduce friction. But overpermissioned agents are the #1 source of production incidents. A T1 agent that can only draft emails is a manageable risk. A T3 agent with write access to your production database is a single prompt injection away from catastrophe.
 
-**In practice:**
-- Every output surfaces in an approval queue (Slack thread, PR review, email digest, dashboard)
-- The human can approve, reject, or edit before anything goes live
-- Approved actions are logged with the approver's identity and timestamp
-- The agent never interprets silence as approval
+---
 
-## 3. Everything Is Logged
+## Principle 2: Draft → Approve → Execute
 
-Every agent action — read, draft, send, error — is logged with:
-- Timestamp (ISO 8601, UTC)
-- Action type (what the agent did)
-- Input summary (what triggered the action)
-- Output summary (what the agent produced)
-- Approval status (pending, approved, rejected, auto)
-- Approver identity (who approved it)
+**No agent sends, publishes, commits, or spends without passing through the approval pipeline.**
 
-Logs are immutable. They are not edited, deleted, or overwritten. They are retained for the compliance window defined in the scope document.
+The approval pipeline is the core mechanism that separates safe agents from dangerous ones. Every action with external consequences follows a three-stage lifecycle:
 
-**Why this matters:**
-- Post-incident investigation requires a complete timeline
-- Client engagements need demonstrable audit trails
-- Compliance frameworks (SOC 2, HIPAA, GDPR) require evidence of access control
-- Trust is built on transparency, not promises
+```
+DRAFT                    APPROVE                  EXECUTE
+Agent generates          Human (or automated       Approved action
+the proposed action      rule) reviews and         is executed with
+with full context        approves or rejects       full audit trail
+```
 
-## 4. Guardrails Are Code, Not Suggestions
+At T1, every draft requires per-item human approval. At T2, defined action classes are pre-approved (e.g., "send emails matching this template" or "merge PRs that pass all checks"). At T3, the agent executes within its scoped boundaries with post-hoc audit review.
 
-A guardrail that lives only in a system prompt is a suggestion. A guardrail that's enforced at the integration layer is a boundary.
+### Implementation Pattern
 
-Both matter. System prompt guardrails handle nuance (tone, brand language, judgment calls). Integration-layer guardrails handle hard limits (blocklisted contacts, forbidden actions, data access boundaries).
+```python
+# Pseudocode — framework-agnostic
+action = agent.draft_action(
+    type="send_email",
+    payload={"to": "customer@example.com", "body": draft_body},
+    context={"trigger": "support_ticket_123", "confidence": 0.92}
+)
 
-**In practice:**
-- Blocklists are explicit: names, domains, resources that the agent cannot touch
-- Permission boundaries are enforced: the agent physically cannot access systems not in its scope
-- Escalation triggers fire automatically: if the agent encounters a condition it can't handle, it stops and alerts
-- Kill switches exist and are tested: a single action disables the agent immediately
+# T1: requires explicit approval
+approval = await approval_pipeline.submit(action)
 
-## 5. Fail Loud, Fail Safe
+if approval.status == "approved":
+    result = await action.execute()
+    audit_log.write(action, approval, result)
+elif approval.status == "rejected":
+    audit_log.write(action, approval, rejection_reason=approval.reason)
+    agent.learn_from_rejection(action, approval.reason)
+```
 
-When an agent encounters an error, ambiguity, or edge case it wasn't designed for, it does three things:
-1. **Stops** — does not attempt to improvise or work around the problem
-2. **Logs** — records exactly what happened, what it was trying to do, and what went wrong
-3. **Alerts** — notifies the human owner through the defined escalation channel
+---
 
-The agent never:
-- Guesses when it doesn't know
-- Fabricates data to fill gaps
-- Retries failed actions without human review
-- Assumes the problem will fix itself
+## Principle 3: Everything Is Logged
 
-**Why "fail loud" matters more than "fail gracefully":**
-A graceful failure that goes unnoticed is worse than a loud failure that gets immediate attention. In agent operations, silent failures compound. A hallucinated data point that goes unnoticed becomes the basis for a decision. A misread context that goes uncorrected shapes every subsequent action. Loud failures get fixed. Silent ones metastasize.
+**Every read, draft, approval, execution, and error — timestamped, structured, cryptographically signed, and immutable.**
+
+Audit logs are not optional. They serve three purposes:
+1. **Accountability** — Who approved what, when, and why
+2. **Debugging** — When something goes wrong, reconstruct exactly what happened
+3. **Trust-building** — Show clients, compliance teams, and stakeholders that your agent is governed
+
+### Log Schema
+
+Every event follows the structured format in [`templates/audit-log-schema.json`](../templates/audit-log-schema.json):
+
+```json
+{
+  "event_id": "uuid-v4",
+  "timestamp_utc": "2026-06-07T15:30:00Z",
+  "agent_id": "support-assistant-prod",
+  "tier": "T1",
+  "action_type": "email.drafted",
+  "actor": "agent",
+  "target": "customer@example.com",
+  "payload_hash": "sha256:abc123...",
+  "outcome": "pending_approval",
+  "context": {
+    "trigger": "ticket_456",
+    "confidence": 0.94
+  },
+  "signature": "hmac-sha256:def456..."
+}
+```
+
+### Non-Negotiable Rules
+- Logs are **append-only** — no updates, no deletes
+- Every log entry is **cryptographically signed** to detect tampering
+- Logs include the **full decision chain**: trigger → draft → approval/rejection → execution → result
+- Log retention is configurable per deployment but defaults to **365 days minimum**
+
+---
+
+## Principle 4: Guardrails Are Code, Not Suggestions
+
+**Blocklists, permission boundaries, and escalation triggers are enforced programmatically.**
+
+Documentation says "don't do X." Code *prevents* X. The difference matters when your agent is running at 3 AM and nobody is watching.
+
+### Types of Guardrails
+
+| Guardrail | Implementation | Example |
+|-----------|---------------|---------|
+| **Blocklists** | Hard-coded denial lists checked before every action | Never contact these emails/domains |
+| **Rate limits** | Action frequency caps per agent per time window | Max 50 emails per hour |
+| **Value thresholds** | Dollar/impact limits that trigger escalation | Orders over $500 require approval |
+| **Scope boundaries** | Permitted integration/action sets per agent | This agent can read Slack but not post |
+| **Content filters** | Output validation before delivery | No PII in external communications |
+| **Time windows** | Permitted operating hours | No customer-facing actions between 10PM–7AM |
+
+### Enforcement Priority
+
+```
+1. Kill switch    — Is this agent suspended? → Block everything
+2. Blocklist      — Is the target on a deny list? → Block + log
+3. Tier check     — Does the agent's tier permit this action type? → Block + log
+4. Rate limit     — Has the agent exceeded its action quota? → Block + log + alert
+5. Threshold      — Does this action exceed configured limits? → Escalate for approval
+6. Scope check    — Is this action within the agent's defined scope? → Block + log
+7. Execute        — All checks passed → Execute + log
+```
+
+---
+
+## Principle 5: Fail Loud, Fail Safe
+
+**When something goes wrong, the agent stops, logs, and alerts. It never improvises past its boundaries.**
+
+Agents should never attempt to recover from errors by expanding their own authority. An agent that can't complete a task should:
+
+1. **Stop** the current action
+2. **Log** the failure with full context
+3. **Alert** the designated human or system
+4. **Wait** for instructions (or fall back to a safe default state)
+
+### Failure Modes
+
+| Failure Type | Agent Response | Alert Level |
+|-------------|---------------|-------------|
+| API error / timeout | Retry with backoff (max 3), then stop and alert | P2 |
+| Permission denied | Log and alert — never retry with elevated permissions | P1 |
+| Confidence below threshold | Pause and escalate to human | P2 |
+| Unexpected output format | Stop action, log raw output, alert | P2 |
+| Kill switch triggered | Immediately cease all operations, log final state | P0 |
+| Anomaly detected (by watchers) | Suspend affected actions, alert, await instructions | P1 |
+
+### The Golden Rule
+
+> If an agent encounters a situation not covered by its scope document, the correct action is **always** to stop and escalate — never to guess.
+
+---
+
+## How These Principles Connect
+
+```
+Zero Trust by Default
+        │
+        ▼
+  Agent starts with minimal permissions
+        │
+        ▼
+Draft → Approve → Execute
+        │
+        ▼
+  Every action passes through governance
+        │
+        ▼
+Everything Is Logged
+        │
+        ▼
+  Complete audit trail for every decision
+        │
+        ▼
+Guardrails Are Code
+        │
+        ▼
+  Boundaries enforced programmatically
+        │
+        ▼
+Fail Loud, Fail Safe
+        │
+        ▼
+  When boundaries are hit, the agent stops — never improvises
+```
+
+These five principles form a closed loop. Remove any one of them and the system has a gap that will eventually produce an incident.
+
+---
+
+→ Next: [Permission Tiers](02-permission-tiers.md)
