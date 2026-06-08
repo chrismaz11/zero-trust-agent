@@ -1,0 +1,487 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Zero-Trust Agent Framework — Ship governed AI agents</title>
+  <meta name="description" content="Open-source governance framework for autonomous AI agents. Permission tiers, audit trails, kill switches, and approval workflows — built from production.">
+  <meta property="og:title" content="Zero-Trust Agent Framework">
+  <meta property="og:description" content="Ship autonomous AI agents with built-in governance, audit trails, and kill switches.">
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://chrismaz11.github.io/zero-trust-agent/">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Zero-Trust Agent Framework">
+  <meta name="twitter:description" content="Ship autonomous AI agents with built-in governance, audit trails, and kill switches.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #0a0a0f;
+      --bg-card: #12121a;
+      --bg-card-hover: #1a1a26;
+      --border: #1e1e2e;
+      --text: #e4e4ef;
+      --text-dim: #8888a0;
+      --accent: #6366f1;
+      --accent-glow: rgba(99, 102, 241, 0.15);
+      --green: #22c55e;
+      --amber: #f59e0b;
+      --red: #ef4444;
+      --cyan: #06b6d4;
+      --radius: 12px;
+    }
+
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.6;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    .container { max-width: 1100px; margin: 0 auto; padding: 0 24px; }
+
+    /* ─── NAV ─── */
+    nav {
+      position: fixed; top: 0; left: 0; right: 0; z-index: 100;
+      background: rgba(10,10,15,0.85);
+      backdrop-filter: blur(16px);
+      border-bottom: 1px solid var(--border);
+      padding: 14px 0;
+    }
+    nav .container {
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    .nav-brand {
+      font-weight: 700; font-size: 1.1rem;
+      color: var(--text); text-decoration: none;
+      display: flex; align-items: center; gap: 8px;
+    }
+    .nav-brand span { color: var(--accent); }
+    .nav-links { display: flex; gap: 28px; align-items: center; }
+    .nav-links a {
+      color: var(--text-dim); text-decoration: none; font-size: 0.9rem; font-weight: 500;
+      transition: color 0.2s;
+    }
+    .nav-links a:hover { color: var(--text); }
+    .btn-nav {
+      background: var(--accent); color: #fff; padding: 8px 18px;
+      border-radius: 8px; font-weight: 600; font-size: 0.85rem;
+      text-decoration: none; transition: opacity 0.2s;
+    }
+    .btn-nav:hover { opacity: 0.9; }
+
+    /* ─── HERO ─── */
+    .hero {
+      padding: 160px 0 100px;
+      text-align: center;
+      position: relative;
+      overflow: hidden;
+    }
+    .hero::before {
+      content: ''; position: absolute; top: 60px; left: 50%; transform: translateX(-50%);
+      width: 600px; height: 600px;
+      background: radial-gradient(circle, var(--accent-glow) 0%, transparent 70%);
+      pointer-events: none;
+    }
+    .hero-badge {
+      display: inline-flex; align-items: center; gap: 8px;
+      background: var(--bg-card); border: 1px solid var(--border);
+      padding: 6px 16px; border-radius: 999px;
+      font-size: 0.8rem; color: var(--text-dim); margin-bottom: 28px;
+    }
+    .hero-badge .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--green); }
+    .hero h1 {
+      font-size: clamp(2.4rem, 5.5vw, 4rem); font-weight: 800;
+      line-height: 1.1; letter-spacing: -0.03em;
+      margin-bottom: 20px; position: relative;
+    }
+    .hero h1 em { font-style: normal; color: var(--accent); }
+    .hero p.sub {
+      font-size: 1.15rem; color: var(--text-dim); max-width: 620px;
+      margin: 0 auto 36px; line-height: 1.7;
+    }
+    .hero-actions { display: flex; gap: 14px; justify-content: center; flex-wrap: wrap; }
+    .btn-primary {
+      background: var(--accent); color: #fff; padding: 14px 28px;
+      border-radius: 10px; font-weight: 600; font-size: 1rem;
+      text-decoration: none; transition: all 0.2s; border: none; cursor: pointer;
+    }
+    .btn-primary:hover { filter: brightness(1.1); transform: translateY(-1px); }
+    .btn-secondary {
+      background: var(--bg-card); color: var(--text); padding: 14px 28px;
+      border-radius: 10px; font-weight: 600; font-size: 1rem; border: 1px solid var(--border);
+      text-decoration: none; transition: all 0.2s; cursor: pointer;
+    }
+    .btn-secondary:hover { border-color: var(--accent); background: var(--bg-card-hover); }
+
+    /* ─── CODE BLOCK ─── */
+    .hero-code {
+      max-width: 500px; margin: 48px auto 0; text-align: left;
+      background: var(--bg-card); border: 1px solid var(--border);
+      border-radius: var(--radius); padding: 20px 24px;
+      font-family: 'JetBrains Mono', monospace; font-size: 0.85rem;
+      color: var(--text-dim); line-height: 1.8;
+    }
+    .hero-code .comment { color: #555570; }
+    .hero-code .keyword { color: var(--accent); }
+    .hero-code .string { color: var(--green); }
+    .hero-code .func { color: var(--cyan); }
+
+    /* ─── PROBLEM ─── */
+    .problem { padding: 80px 0; }
+    .problem h2 {
+      font-size: 1.8rem; font-weight: 700; text-align: center;
+      margin-bottom: 48px; letter-spacing: -0.02em;
+    }
+    .problem-grid {
+      display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 18px;
+    }
+    .problem-card {
+      background: var(--bg-card); border: 1px solid var(--border);
+      border-radius: var(--radius); padding: 28px;
+      transition: border-color 0.2s;
+    }
+    .problem-card:hover { border-color: #2a2a40; }
+    .problem-card .icon { font-size: 1.6rem; margin-bottom: 14px; }
+    .problem-card h3 { font-size: 1rem; font-weight: 600; margin-bottom: 8px; }
+    .problem-card p { color: var(--text-dim); font-size: 0.9rem; }
+
+    /* ─── TIERS ─── */
+    .tiers { padding: 80px 0; }
+    .tiers h2 {
+      font-size: 1.8rem; font-weight: 700; text-align: center; margin-bottom: 16px;
+    }
+    .tiers .subtitle {
+      text-align: center; color: var(--text-dim); margin-bottom: 48px; font-size: 1rem;
+    }
+    .tier-grid {
+      display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px;
+    }
+    @media (max-width: 768px) {
+      .tier-grid { grid-template-columns: 1fr 1fr; }
+    }
+    @media (max-width: 480px) {
+      .tier-grid { grid-template-columns: 1fr; }
+    }
+    .tier-card {
+      background: var(--bg-card); border: 1px solid var(--border);
+      border-radius: var(--radius); padding: 28px; text-align: center;
+    }
+    .tier-card .tier-label {
+      font-family: 'JetBrains Mono', monospace; font-size: 0.75rem;
+      color: var(--accent); text-transform: uppercase; letter-spacing: 0.08em;
+      margin-bottom: 8px;
+    }
+    .tier-card h3 { font-size: 1.2rem; font-weight: 700; margin-bottom: 10px; }
+    .tier-card p { color: var(--text-dim); font-size: 0.85rem; line-height: 1.6; }
+
+    /* ─── FEATURES ─── */
+    .features { padding: 80px 0; }
+    .features h2 {
+      font-size: 1.8rem; font-weight: 700; text-align: center; margin-bottom: 48px;
+    }
+    .feature-grid {
+      display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px;
+    }
+    @media (max-width: 768px) { .feature-grid { grid-template-columns: 1fr; } }
+    .feature-card {
+      background: var(--bg-card); border: 1px solid var(--border);
+      border-radius: var(--radius); padding: 28px;
+    }
+    .feature-card h3 { font-size: 1rem; font-weight: 600; margin-bottom: 8px; }
+    .feature-card p { color: var(--text-dim); font-size: 0.9rem; }
+    .feature-card .tag {
+      display: inline-block; margin-top: 14px; font-size: 0.75rem;
+      font-family: 'JetBrains Mono', monospace; color: var(--accent);
+      background: var(--accent-glow); padding: 3px 10px; border-radius: 6px;
+    }
+
+    /* ─── PRICING ─── */
+    .pricing { padding: 80px 0; }
+    .pricing h2 {
+      font-size: 1.8rem; font-weight: 700; text-align: center; margin-bottom: 16px;
+    }
+    .pricing .subtitle {
+      text-align: center; color: var(--text-dim); margin-bottom: 48px; font-size: 1rem;
+    }
+    .pricing-grid {
+      display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 18px;
+    }
+    .pricing-card {
+      background: var(--bg-card); border: 1px solid var(--border);
+      border-radius: var(--radius); padding: 32px 28px;
+    }
+    .pricing-card.featured { border-color: var(--accent); }
+    .pricing-card h3 { font-size: 1.1rem; font-weight: 700; margin-bottom: 6px; }
+    .pricing-card .price {
+      font-size: 2rem; font-weight: 800; margin: 12px 0 4px;
+    }
+    .pricing-card .price-note { color: var(--text-dim); font-size: 0.85rem; margin-bottom: 20px; }
+    .pricing-card ul { list-style: none; }
+    .pricing-card li {
+      padding: 8px 0; color: var(--text-dim); font-size: 0.9rem;
+      border-top: 1px solid var(--border);
+    }
+    .pricing-card li::before { content: '✓ '; color: var(--green); font-weight: 600; }
+
+    /* ─── CTA ─── */
+    .cta {
+      padding: 100px 0; text-align: center;
+    }
+    .cta h2 {
+      font-size: 2.2rem; font-weight: 800; margin-bottom: 16px; letter-spacing: -0.02em;
+    }
+    .cta p { color: var(--text-dim); font-size: 1.1rem; margin-bottom: 32px; }
+    .cta-actions { display: flex; gap: 14px; justify-content: center; flex-wrap: wrap; }
+
+    /* ─── FOOTER ─── */
+    footer {
+      border-top: 1px solid var(--border); padding: 40px 0; text-align: center;
+      color: var(--text-dim); font-size: 0.85rem;
+    }
+    footer a { color: var(--text-dim); text-decoration: none; }
+    footer a:hover { color: var(--text); }
+  </style>
+</head>
+<body>
+
+<!-- NAV -->
+<nav>
+  <div class="container">
+    <a href="#" class="nav-brand">🛡️ <span>Zero-Trust</span> Agent</a>
+    <div class="nav-links">
+      <a href="#problem">Why</a>
+      <a href="#tiers">Tiers</a>
+      <a href="#features">Features</a>
+      <a href="#pricing">Services</a>
+      <a href="https://github.com/chrismaz11/zero-trust-agent" class="btn-nav">⭐ Star on GitHub</a>
+    </div>
+  </div>
+</nav>
+
+<!-- HERO -->
+<section class="hero">
+  <div class="container">
+    <div class="hero-badge">
+      <span class="dot"></span> Open source · MIT License · Production-tested
+    </div>
+    <h1>Ship AI agents your<br>compliance team <em>trusts</em></h1>
+    <p class="sub">
+      Open-source governance framework for autonomous AI agents.
+      Permission tiers, cryptographic audit trails, human-in-the-loop approval workflows,
+      and kill switches — built from production.
+    </p>
+    <div class="hero-actions">
+      <a href="https://github.com/chrismaz11/zero-trust-agent/blob/main/docs/getting-started.md" class="btn-primary">Get Started →</a>
+      <a href="https://github.com/chrismaz11/zero-trust-agent" class="btn-secondary">View on GitHub</a>
+    </div>
+    <div class="hero-code">
+      <span class="comment"># Deploy a governed agent in minutes</span><br>
+      <span class="keyword">agent</span> = Agent(<span class="string">"customer-support"</span>)<br>
+      agent.<span class="func">set_tier</span>(<span class="string">"T1"</span>)  <span class="comment"># Draft-only, human approves</span><br>
+      agent.<span class="func">add_guardrails</span>(blocklist, scope_doc)<br>
+      agent.<span class="func">enable_audit_log</span>(signed=<span class="keyword">True</span>)<br>
+      agent.<span class="func">deploy</span>()  <span class="comment"># Governed from day one</span>
+    </div>
+  </div>
+</section>
+
+<!-- PROBLEM -->
+<section class="problem" id="problem">
+  <div class="container">
+    <h2>You built an agent. Now what?</h2>
+    <div class="problem-grid">
+      <div class="problem-card">
+        <div class="icon">🔓</div>
+        <h3>No permission model</h3>
+        <p>Your agent can access everything. There's no tiered permission system, no boundary enforcement, no least-privilege defaults.</p>
+      </div>
+      <div class="problem-card">
+        <div class="icon">📝</div>
+        <h3>No audit trail</h3>
+        <p>Something goes wrong at 3am. Who approved that action? What data did the agent read? Unstructured logs won't cut it in an audit.</p>
+      </div>
+      <div class="problem-card">
+        <div class="icon">🚨</div>
+        <h3>No kill switch</h3>
+        <p>The agent starts doing something unexpected. How do you stop it? How fast? Most teams can't answer that question.</p>
+      </div>
+      <div class="problem-card">
+        <div class="icon">🤝</div>
+        <h3>No approval workflow</h3>
+        <p>Your agent sends an email, commits code, or makes a purchase — with nobody reviewing it first. One bad action and you lose trust.</p>
+      </div>
+      <div class="problem-card">
+        <div class="icon">📊</div>
+        <h3>No compliance story</h3>
+        <p>A client asks "how do you govern your AI?" and you say "we're careful." That's not an answer. You need a framework.</p>
+      </div>
+      <div class="problem-card">
+        <div class="icon">🏗️</div>
+        <h3>Everyone reinvents it</h3>
+        <p>Every team duct-tapes their own governance layer. Inconsistent, untested, and undocumented. There should be a standard.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- TIERS -->
+<section class="tiers" id="tiers">
+  <div class="container">
+    <h2>Four trust levels. Explicit promotion.</h2>
+    <p class="subtitle">Every agent starts at T0. Capabilities are earned, not assumed.</p>
+    <div class="tier-grid">
+      <div class="tier-card">
+        <div class="tier-label">Tier 0</div>
+        <h3>Observer</h3>
+        <p>Read-only. Analyze data, surface findings. No external actions. Zero risk.</p>
+      </div>
+      <div class="tier-card">
+        <div class="tier-label">Tier 1</div>
+        <h3>Drafter</h3>
+        <p>Generate drafts and proposals. Every action requires human approval before execution.</p>
+      </div>
+      <div class="tier-card">
+        <div class="tier-label">Tier 2</div>
+        <h3>Executor</h3>
+        <p>Execute pre-approved action classes autonomously. Exceptions escalate to humans.</p>
+      </div>
+      <div class="tier-card">
+        <div class="tier-label">Tier 3</div>
+        <h3>Autonomous</h3>
+        <p>Full authority within scoped boundaries. Post-hoc audit. Anomaly-triggered alerts.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- FEATURES -->
+<section class="features" id="features">
+  <div class="container">
+    <h2>Everything you need to govern agents</h2>
+    <div class="feature-grid">
+      <div class="feature-card">
+        <h3>🔐 Permission Engine</h3>
+        <p>Granular, per-agent capability grants. Blocklists, allowlists, scope boundaries enforced in code — not by convention.</p>
+        <span class="tag">framework/02-permission-tiers</span>
+      </div>
+      <div class="feature-card">
+        <h3>✅ Approval Workflows</h3>
+        <p>Draft → Approve → Execute pipeline. Per-item or blanket approvals. Configurable escalation rules.</p>
+        <span class="tag">framework/03-deployment-checklist</span>
+      </div>
+      <div class="feature-card">
+        <h3>📋 Cryptographic Audit Logs</h3>
+        <p>Every action logged with structured JSON. Signed, timestamped, immutable. Ready for SOC 2, HIPAA, or regulatory review.</p>
+        <span class="tag">templates/audit-log-schema.json</span>
+      </div>
+      <div class="feature-card">
+        <h3>💓 Heartbeat Monitoring</h3>
+        <p>Continuous health checks on every running agent. Latency, error rates, permission violations — dashboarded and alertable.</p>
+        <span class="tag">framework/04-monitoring-protocol</span>
+      </div>
+      <div class="feature-card">
+        <h3>🚨 Kill Switch</h3>
+        <p>One command to freeze any agent. Graceful shutdown with state preservation. Automatic triggers on anomaly detection.</p>
+        <span class="tag">framework/05-incident-response</span>
+      </div>
+      <div class="feature-card">
+        <h3>👁️ Proactive Watchers</h3>
+        <p>Configurable trigger system. Monitor for thresholds, anomalies, schedule gaps — agents that don't just respond, but watch.</p>
+        <span class="tag">architecture/proactive-engine</span>
+      </div>
+      <div class="feature-card">
+        <h3>🏢 Multi-Tenant Ready</h3>
+        <p>Workspace isolation, per-tenant configs, scoped data access. Deploy governed agents for clients without cross-contamination.</p>
+        <span class="tag">architecture/platform-overview</span>
+      </div>
+      <div class="feature-card">
+        <h3>📄 Templates & Examples</h3>
+        <p>Scope documents, system prompt skeletons, config files, and 4 real-world agent examples. Copy, paste, deploy.</p>
+        <span class="tag">templates/ · examples/</span>
+      </div>
+      <div class="feature-card">
+        <h3>🔧 Stack Agnostic</h3>
+        <p>Works with any LLM, any framework, any language. The governance layer sits between your agent and the outside world.</p>
+        <span class="tag">framework/06-integration-guide</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- PRICING -->
+<section class="pricing" id="pricing">
+  <div class="container">
+    <h2>Need help deploying?</h2>
+    <p class="subtitle">The framework is free and open source. Professional services available if you want hands-on support.</p>
+    <div class="pricing-grid">
+      <div class="pricing-card">
+        <h3>Agent Audit</h3>
+        <div class="price">$1,500<span style="font-size:1rem;font-weight:500;color:var(--text-dim)">+</span></div>
+        <div class="price-note">One-time assessment</div>
+        <ul>
+          <li>Review your current agent setup</li>
+          <li>Permission gap analysis</li>
+          <li>Risk assessment report</li>
+          <li>Remediation roadmap</li>
+          <li>Delivered in 5 business days</li>
+        </ul>
+      </div>
+      <div class="pricing-card featured">
+        <h3>Full Deployment</h3>
+        <div class="price">$5,000<span style="font-size:1rem;font-weight:500;color:var(--text-dim)">+</span></div>
+        <div class="price-note">4–6 week engagement</div>
+        <ul>
+          <li>Everything in Audit</li>
+          <li>Framework implementation</li>
+          <li>Custom permission tiers</li>
+          <li>Audit logging integration</li>
+          <li>Kill switch & monitoring setup</li>
+          <li>Team training session</li>
+        </ul>
+      </div>
+      <div class="pricing-card">
+        <h3>Managed Governance</h3>
+        <div class="price">$500<span style="font-size:1rem;font-weight:500;color:var(--text-dim)">/mo</span></div>
+        <div class="price-note">Ongoing support</div>
+        <ul>
+          <li>Monthly governance review</li>
+          <li>Incident response support</li>
+          <li>Permission tuning</li>
+          <li>Agent health monitoring</li>
+          <li>Quarterly compliance reports</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- CTA -->
+<section class="cta">
+  <div class="container">
+    <h2>Start governing your agents today</h2>
+    <p>30 minutes from clone to your first governed agent deployment.</p>
+    <div class="cta-actions">
+      <a href="https://github.com/chrismaz11/zero-trust-agent/blob/main/docs/getting-started.md" class="btn-primary">Read the Docs →</a>
+      <a href="https://github.com/chrismaz11/zero-trust-agent" class="btn-secondary">⭐ Star on GitHub</a>
+    </div>
+  </div>
+</section>
+
+<!-- FOOTER -->
+<footer>
+  <div class="container">
+    <p>
+      Zero-Trust Agent Framework · <a href="https://github.com/chrismaz11/zero-trust-agent">GitHub</a> · MIT License
+      <br>
+      Built by <a href="https://trustsignal.dev">Christopher Marziani</a> · Chicago, IL
+    </p>
+  </div>
+</footer>
+
+</body>
+</html>
