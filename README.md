@@ -4,7 +4,7 @@
     <strong>Ship autonomous AI agents with built-in governance, audit trails, and kill switches.</strong>
   </p>
   <p align="center">
-    <a href="#quick-start">Quick Start</a> · <a href="docs/getting-started.md">Docs</a> · <a href="architecture/">Architecture</a> · <a href="#why-this-exists">Why</a> · <a href="CONTRIBUTING.md">Contribute</a>
+    <a href="#quick-start">Quick Start</a> · <a href="docs/getting-started.md">Docs</a> · <a href="architecture/">Architecture</a> · <a href="SERVICES.md">Services</a> · <a href="#why-this-exists">Why</a> · <a href="CONTRIBUTING.md">Contribute</a>
   </p>
   <p align="center">
     <img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="License: MIT">
@@ -267,6 +267,22 @@ The zero-trust framework applies the same logic to AI agents:
 The framework is methodology-first. It works with any LLM, any cloud, any orchestration tool. The patterns are the product — not a proprietary SDK you can't escape.
 
 ---
+
+
+---
+
+## Professional Services
+
+The framework is free and open source. If you want hands-on help:
+
+| Service | Starting At | What You Get |
+|---------|------------|--------------|
+| **Agent Audit** | $1,500 | Permission gap analysis, risk assessment, remediation roadmap |
+| **Full Deployment** | $5,000 | End-to-end implementation, training, monitoring setup |
+| **Managed Governance** | $500/mo | Ongoing monitoring, incident response, quarterly reports |
+
+→ Details: [`SERVICES.md`](SERVICES.md) · Email: [christopher@trustsignal.dev](mailto:christopher@trustsignal.dev)
+
 
 ## Contributing
 
