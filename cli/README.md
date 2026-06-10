@@ -9,6 +9,7 @@
 - 🧠 **Active AI Session Auditor:** Analyzes your agent's description and external system access to recommend the safest possible configuration.
 - 🚦 **Security Tier Recommendations:** Automatically profiles your agent's risk level to select the correct governance tier (**T0–T3**).
 - 💡 **Best Responses Guidance:** Suggests optimal responses and implementation actions based on security levels.
+- 🛡️ **No-Code Security Wrapping (`zta wrap`):** Intercepts standard stdin/stdout Model Context Protocol (MCP) servers to log requests, block unauthorized tools, screen injections, and enforce kill-switches.
 - ⚡ **ZTA Cloud Integration:** Connects your local configuration to a hosted dashboard for cryptographically signed logs and Slack-based approval workflows.
 - 📝 **Automatic File Generation:** Generates `zta-config.yaml`, `zta-scope.md`, and `zta-system-prompt.txt` automatically.
 
@@ -32,18 +33,29 @@ npm install -g zta
 
 ## Quick Start
 
-Run the onboarding wizard in the root directory of your agent project:
+### 1. Initialize Configuration
+Run the onboarding wizard in your agent project directory to generate your zero-trust scopes and system prompts:
 
 ```bash
-zta init
+# Start wizard (runs 'zta init' by default)
+npx zta
 ```
 
-The tool will guide you through:
-1. **Agent Metadata:** Identifying the name, owner, and purpose of your agent.
-2. **Access Profile:** Specifying databases, APIs, or files the agent reads/writes.
-3. **AI Risk Assessment:** Providing a security audit, recommending a tier, and outlining blocklists/guardrails.
-4. **ZTA Cloud Setup:** Offering a choice between local storage ($0/mo) and ZTA Cloud ($49/mo) for remote immutable logs and Slack integration.
-5. **File Generation:** Saving the framework configuration, scope markdown, and system prompt text files.
+This generates `zta-config.yaml`, `zta-scope.md`, and `zta-system-prompt.txt`.
+
+### 2. Wrap and Run MCP Server (No-Code Security)
+Instead of rewriting your code, wrap any standard Model Context Protocol (MCP) server command with the `zta wrap` proxy. This instantly applies your configurations to the tool stream:
+
+```bash
+# Wrap postgres database MCP tool server
+npx zta wrap --mcp "npx @modelcontextprotocol/server-postgres"
+```
+
+The proxy wrapper will:
+* **Check permissions** in real-time, blocking unauthorized database mutations (e.g. T0 observer trying to edit data).
+* **Scan inputs** via the local **Injection Shield**, blocking malicious arguments.
+* **Audit Tool Calls** into a local tamper-proof **Cryptographic Ledger** (`zta-audit.signed.jsonl`).
+* **Enforce Kill-Switch:** Instantly block all calls if `zta-kill.flag` exists in your directory.
 
 ---
 
