@@ -162,7 +162,29 @@ zero-trust-agent/
 
 ## Quick Start
 
-### 1. Scope your agent
+### ⚡ Option A: Interactive AI-Guided Onboarding (Recommended)
+
+You can initialize your zero-trust configurations in under 3 minutes using our interactive CLI setup wizard. The wizard runs active AI profiling directly in your terminal:
+
+```bash
+# Run the interactive onboarding wizard
+npx zta
+```
+
+This CLI:
+1. Audits your agent's risk profile using active AI (Gemini, OpenAI, or local heuristics).
+2. Suggests the best-practice **Trust Tier (T0–T3)** and explains the security rationale.
+3. Assembles your read/write/forbidden permission boundaries and guardrails.
+4. Generates all files (`zta-config.yaml`, `zta-scope.md`, `zta-system-prompt.txt`) automatically in your directory.
+5. Provides a direct connection bridge to **ZTA Cloud** for remote audit logging and Slack notifications.
+
+---
+
+### 📝 Option B: Manual Setup
+
+If you prefer to configure manually, follow these steps:
+
+#### 1. Scope your agent
 
 Copy [`templates/agent-scope-document.md`](templates/agent-scope-document.md) and define:
 - **What** the agent does (one sentence)
@@ -170,7 +192,7 @@ Copy [`templates/agent-scope-document.md`](templates/agent-scope-document.md) an
 - **What** it is explicitly forbidden from doing
 - **How** outputs get reviewed
 
-### 2. Write the system prompt
+#### 2. Write the system prompt
 
 Use [`templates/system-prompt-skeleton.md`](templates/system-prompt-skeleton.md). The key sections:
 - Identity and purpose
@@ -178,7 +200,7 @@ Use [`templates/system-prompt-skeleton.md`](templates/system-prompt-skeleton.md)
 - Guardrails (blocklists, prohibited actions, escalation triggers)
 - Failure modes (what to do when things break)
 
-### 3. Configure the governance layer
+#### 3. Configure the governance layer
 
 Set up the approval workflow, audit logging, and monitoring:
 
@@ -271,15 +293,31 @@ The framework is methodology-first. It works with any LLM, any cloud, any orches
 
 ---
 
-## Professional Services
+## ZTA Cloud & Professional Services
 
-The framework is free and open source. If you want hands-on help:
+The core Zero-Trust Agent Framework and CLI are free and open source. For team collaboration, production visibility, and compliance support, we offer ZTA Cloud (SaaS) and specialized consulting services.
+
+### ZTA Cloud (SaaS Platform)
+
+Streamline agent monitoring, store tamper-proof logs, and route approvals directly to your team:
+
+| Plan | Price | Features |
+|------|-------|----------|
+| **ZTA Developer (OSS)** | **$0** | Local configs, local JSONL files, terminal manual approvals |
+| **ZTA Cloud Team** | **$49/mo** per agent | Central signed remote logs, **Slack/Teams active approval buttons**, live dashboard, SMS status alerts |
+| **ZTA Enterprise** | **Custom** | SSO/SAML, custom database logging (Splunk, Datadog), 24/7 SLA on-call, compliance exporting |
+
+👉 **Sign up for a free trial during the `npx zta` setup workflow!**
+
+### Professional Services
+
+If you need hands-on help from our security and agent engineers:
 
 | Service | Starting At | What You Get |
 |---------|------------|--------------|
 | **Agent Audit** | $1,500 | Permission gap analysis, risk assessment, remediation roadmap |
 | **Full Deployment** | $5,000 | End-to-end implementation, training, monitoring setup |
-| **Managed Governance** | $500/mo | Ongoing monitoring, incident response, quarterly reports |
+| **Managed Governance** | $500/mo | Ongoing monitoring, incident response support, quarterly reports |
 
 → Details: [`SERVICES.md`](SERVICES.md) · Email: [christopher@trustsignal.dev](mailto:christopher@trustsignal.dev)
 

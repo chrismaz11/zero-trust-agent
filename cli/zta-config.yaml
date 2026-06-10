@@ -1,0 +1,44 @@
+agent:
+  name: SupportCoordinator
+  tier: T1
+  owner: Security-Ops
+  version: 1.0.0
+permissions:
+  read:
+    - crm_database
+    - support_tickets
+    - knowledge_base_articles
+  draft:
+    - customer_email_drafts
+    - ticket_status_updates
+  execute: []
+approval:
+  mode: per_item
+  notify:
+    - local_terminal
+  timeout_hours: 24
+audit:
+  log_reads: true
+  log_drafts: true
+  log_approvals: true
+  retention_days: 30
+  signature: local-hmac
+  destination: local_file_jsonl
+monitoring:
+  heartbeat_interval: 300
+  alert_on_silence: false
+  health_checks:
+    - response_time
+    - error_rate
+    - rejection_rate
+kill_switch:
+  enabled: true
+  trigger:
+    - manual
+    - error_threshold
+    - anomaly_detection
+  action: suspend_and_alert
+  mechanism: Slack command `/kill-support-agent` or setting `ACTIVE=false` in the
+    ZTA config database.
+zta_cloud:
+  enabled: false
